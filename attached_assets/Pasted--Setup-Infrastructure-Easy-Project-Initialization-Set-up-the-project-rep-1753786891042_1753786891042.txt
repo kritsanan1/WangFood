@@ -1,0 +1,104 @@
+## Setup & Infrastructure
+
+### [ ] **[Easy]** Project Initialization
+- [ ] Set up the project repository on Github or similar
+- [ ] Initialize the project using Vite with React and TypeScript
+- [ ] Configure the basic folder structure for frontend (components, pages, assets, utils)
+- [ ] Install and configure Tailwind CSS
+
+### [ ] **[Medium]** Supabase & Backend Setup
+- [ ] Create a Supabase account and initialize a new project
+- [ ] Set up PostgreSQL database schema based on the following tables:
+  - Users: UserID, Name, Email, Phone, Address, SubscriptionStatus
+  - Restaurants: RestaurantID, Name, Address, CuisineType, Rating
+  - Menus: MenuID, RestaurantID, ItemName, Description, Price, Image
+  - Orders: OrderID, UserID, RestaurantID, TotalAmount, Status, CreatedAt
+  - Reviews: ReviewID, UserID, RestaurantID, Rating, Comment, CreatedAt
+- [ ] Configure authentication in Supabase (Enabling Email and Social Media login)
+- [ ] Implement Row-Level Security policies as needed (default enabled)
+
+## Core Features
+
+### [ ] **[Medium]** User Registration & Authentication
+- [ ] Develop signup and login pages allowing registration via email and social media
+- [ ] Integrate Supabase Auth for handling JWT-based authentication and account verification
+- [ ] Implement a simple profile page for user details
+- [ ] Ensure localization (Thai language support) for registration interface
+
+### [ ] **[Easy]** Restaurant Listings
+- [ ] Create an API call or Supabase query to fetch the list of restaurants in Wang Sam Mo
+- [ ] Implement a page to display a comprehensive list of restaurants with basic details (name, address, cuisine type, rating)
+
+### [ ] **[Medium]** Menu Browsing
+- [ ] Develop a dynamic page for each restaurant that loads its menu items
+- [ ] Display images, descriptions, and prices for each menu item
+- [ ] Incorporate filtering or sorting options for menu items
+
+### [ ] **[Medium]** Order Placement
+- [ ] Implement functionality for adding menu items to a cart
+- [ ] Develop order creation logic that sends order details to the backend (Supabase Orders table)
+- [ ] Ensure order validation such that orders can only be placed within the Wang Sam Mo area
+
+### [ ] **[Hard]** Real-Time Order Tracking
+- [ ] Use Supabase's real-time capabilities to subscribe to order status changes
+- [ ] Develop an order tracking page that displays live updates (consider using a map or progress bar layout)
+- [ ] Ensure there is a fallback mechanism for when real-time updates fail
+
+### [ ] **[Medium]** Payment Integration
+- [ ] Research popular Thai payment gateways and select one suitable for integration
+- [ ] Develop a payment processing flow that securely handles transaction details
+- [ ] Implement integration with the chosen payment gateway including error handling and transaction verification
+
+### [ ] **[Easy]** Customer Reviews
+- [ ] Implement a review widget component allowing users to rate restaurants and provide comments
+- [ ] Create backend logic to store user reviews in the Reviews table
+- [ ] Display reviews on the restaurant’s detail page
+
+## UI/UX Implementation
+
+### [ ] **[Easy]** Layout & Navigation
+- [ ] Design and implement a global Navbar and Footer components
+- [ ] Create a responsive Search Bar component that fits in the layout
+- [ ] Ensure consistent design across all pages with local imagery and color themes inspired by Wang Sam Mo
+
+### [ ] **[Medium]** Page Development
+- [ ] Home Page: Display restaurant categories, popular dishes, and promotional banners
+- [ ] Restaurant Listings Page: List all restaurants in a visually appealing manner
+- [ ] Menu Page: Provide a detailed view of restaurant menus with filtering/sorting options
+- [ ] Order Tracking Page: Show live order status updates (include map integration if applicable)
+- [ ] User Profile Page: Allow users to view and update their details
+- [ ] Admin Panel: Build a web-based interface for restaurants to manage listings and orders (basic CRUD operations)
+
+### [ ] **[Easy]** UI Components
+- [ ] Order Card: Display summary information about a placed order
+- [ ] Review Widget: Allow submitting and displaying reviews
+
+## Testing & Debugging
+
+### [ ] **[Medium]** Unit & Integration Testing
+- [ ] Write unit tests for key functionalities (e.g., API calls, authentication flows, order placement logic) using a testing framework such as Jest
+- [ ] Perform integration testing for Supabase queries and real-time subscriptions
+- [ ] Test UI components for responsiveness and localized content
+
+### [ ] **[Easy]** User Flow Testing
+- [ ] Test the complete Registration Flow: Sign up, email verification, profile setup
+- [ ] Test the Order Flow: Menu browsing, order placement, order tracking
+- [ ] Test the Review Flow: Submitting and viewing customer reviews
+
+## Deployment & Launch
+
+### [ ] **[Easy]** Deployment Setup
+- [ ] Configure deployment settings for the frontend (e.g., Vercel, Netlify, or similar service)
+- [ ] Deploy the application and ensure proper environment variables are set for Supabase keys and endpoints
+
+### [ ] **[Medium]** Post-Deployment Testing & Documentation
+- [ ] Perform end-to-end testing in the deployed environment to ensure all integrations work correctly
+- [ ] Document the setup process, API endpoints, and common troubleshooting steps for future reference
+
+### [ ] **[Easy]** Launch & Monitoring
+- [ ] Set up basic monitoring for frontend and backend (e.g., error logging, performance metrics)
+- [ ] Prepare a rollback plan in case of critical issues post-launch
+
+---
+
+This comprehensive task breakdown divides the project into actionable tasks suitable for junior developers. Each task is associated with a difficulty level and includes detailed sub-tasks and technical notes to guide the development process.

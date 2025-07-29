@@ -1,0 +1,89 @@
+# Project Name: Tourderwang
+
+## Description
+Tourderwang is a localized food delivery application designed specifically for Wang Sam Mo, Udonthani, Thailand. The app aims to connect local restaurants with customers, providing a seamless and efficient platform for food ordering and delivery, operating in the Thai language with a freemium SaaS model.
+
+## Primary Goals
+- Facilitate efficient food ordering and delivery for local residents with a focus on user-friendliness and modern design.
+- Empower local restaurants to manage their offerings and orders through an intuitive interface.
+- Implement a freemium business model with premium features enhancing the user experience.
+
+----------------------------------------------------
+
+## Tech Stack & Environment
+
+**Frontend:** Vite + React + TypeScript + Tailwind CSS
+
+**Backend:** Supabase (PostgreSQL + Auth)
+
+**Target Platform:** Single-Page Application
+
+**Framework Versions & Config:** Latest stable versions
+
+----------------------------------------------------
+
+## Requirements & Features
+
+### Core Features:
+
+- Enhanced User Registration: Streamlined process with support for email and social media logins.
+- Comprehensive Restaurant Listings: Detailed profiles for restaurants catering to the Wang Sam Mo area.
+- Interactive Menu Browsing: Rich menus with images, descriptions, and price details.
+- Efficient Order Placement: Direct order functionality with automated confirmations.
+- Real-Time Order Tracking: Dynamic updates from preparation through to delivery.
+- Integrated Payment System: Secure transactions via popular Thai payment gateways.
+- Customer Feedback System: Mechanism for users to rate and review both restaurants and individual food items.
+
+### User Flows
+- **Registration Flow:** Streamlined user sign-up process with verification and profile customization.
+- **Order Flow:** Seamless browsing, selection, and order tracking through to delivery.
+- **Feedback Flow:** After service, users provide ratings and reviews, contributing to community insights.
+
+### Business Rules
+- Freemium access with premium service tiers available for subscription.
+- Administrative controls for restaurants to update listings and manage orders.
+- Geolocation-based order placements, restricted to Wang Sam Mo.
+
+----------------------------------------------------
+
+## UI/UX Design
+
+### Layout
+- **Homepage:** A vibrant showcase with restaurant categories, popular dishes, and promotional content.
+- **Menu Page:** Intuitive filters and sorting for menu navigation.
+- **Order Tracking Page:** Live order updates with interactive map integration.
+
+### Look & Feel
+- Sleek, modern aesthetics integrating local culture and imagery, ensuring an approachable interface.
+
+### Pages
+- **Home**
+- **Restaurant Listings**
+- **Menu**
+- **Order Tracking**
+- **User Profile**
+- **Admin Panel**
+
+### Components
+- **Navbar**
+- **Footer**
+- **Search Bar**
+- **Order Card**
+- **Review Widget**
+
+----------------------------------------------------
+
+## Data Model & Supabase Setup
+
+### Database Schema
+- **Users:** UserID, Name, Email, Phone, Address, SubscriptionStatus
+- **Restaurants:** RestaurantID, Name, Address, CuisineType, Rating
+- **Menus:** MenuID, RestaurantID, ItemName, Description, Price, Image
+- **Orders:** OrderID, UserID, RestaurantID, TotalAmount, Status, CreatedAt
+- **Reviews:** ReviewID, UserID, RestaurantID, Rating, Comment, CreatedAt
+
+### Row-Level Security
+Enabled by default
+
+### Auth Requirements
+- Support for email and social media logins with robust JWT-based authentication.
