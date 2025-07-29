@@ -22,7 +22,7 @@ function Router() {
         <>
           <Route path="/" component={Home} />
           <Route path="/restaurant/:id" component={RestaurantDetail} />
-          <Route path="/orders/:id" component={OrderTracking} />
+          <Route path="/orders" component={OrderTracking} />
           <Route path="/dashboard" component={RestaurantDashboard} />
         </>
       )}

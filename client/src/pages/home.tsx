@@ -5,10 +5,12 @@ import Footer from "@/components/Footer";
 import RestaurantCard from "@/components/RestaurantCard";
 import MenuItemCard from "@/components/MenuItemCard";
 import ShoppingCart from "@/components/ShoppingCart";
+import SearchBar from "@/components/SearchBar";
+import AddToCartButton from "@/components/AddToCartButton";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Search, MapPin, Clock, Utensils, Coffee, IceCream, Pizza, Plus } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { MapPin, Clock, Utensils, Coffee, IceCream, Pizza, TrendingUp, Star, Search, Plus } from "lucide-react";
 import type { Restaurant, Menu } from "@shared/schema";
 
 const categories = [
@@ -83,14 +85,10 @@ export default function Home() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Search and Categories */}
         <section className="mb-8">
-          <div className="relative mb-6">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-            <Input
-              type="text"
-              placeholder="ค้นหาร้านอาหาร หรือเมนู..."
-              className="pl-10 pr-4 py-3 w-full rounded-full border-gray-300"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+          <div className="mb-6">
+            <SearchBar 
+              className="w-full"
+              onSearch={(query) => setSearchQuery(query)}
             />
           </div>
           
@@ -315,16 +313,12 @@ export default function Home() {
                       
                       {/* Quick Add Button */}
                       <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                        <Button
-                          size="sm"
+                        <AddToCartButton
+                          menuId={dish.id}
+                          itemName={dish.itemName}
+                          price={dish.price}
                           className="bg-white hover:bg-gray-50 text-orange-600 rounded-full w-8 h-8 p-0 shadow-lg"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            console.log("Add to cart:", dish.itemName);
-                          }}
-                        >
-                          <Plus className="h-4 w-4" />
-                        </Button>
+                        />
                       </div>
                     </div>
                     
@@ -344,15 +338,12 @@ export default function Home() {
                           </span>
                           <span className="text-xs text-gray-500">ราคาต่อหน่วย</span>
                         </div>
-                        <Button
+                        <AddToCartButton
+                          menuId={dish.id}
+                          itemName={dish.itemName}
+                          price={dish.price}
                           className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-full shadow-md hover:shadow-lg transition-all duration-200 font-medium"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            console.log("Add to cart:", dish.itemName);
-                          }}
-                        >
-                          เพิ่มลงรถเข็น
-                        </Button>
+                        />
                       </div>
                     </div>
                   </div>

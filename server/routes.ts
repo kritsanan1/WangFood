@@ -252,6 +252,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Cart routes
+  app.get('/api/cart', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const cartItems = await storage.getUserCartItems(userId);
+      res.json(cartItems);
+    } catch (error) {
+      console.error("Error fetching cart:", error);
+      res.status(500).json({ message: "Failed to fetch cart" });
+    }
+  });
+
+  app.post('/api/cart/add', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { menuId, quantity, specialInstructions } = req.body;
+      
+      const cartItem = await storage.addToCart({
+        userId,
+        menuId,
+        quantity: quantity || 1,
+        specialInstructions: specialInstructions || null
+      });
+      
+      res.json(cartItem);
+    } catch (error) {
+      console.error("Error adding to cart:", error);
+      res.status(500).json({ message: "Failed to add to cart" });
+    }
+  });
+
+  app.put('/api/cart/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+      const { quantity, specialInstructions } = req.body;
+      
+      const cartItem = await storage.updateCartItem(id, userId, { quantity, specialInstructions });
+      res.json(cartItem);
+    } catch (error) {
+      console.error("Error updating cart item:", error);
+      res.status(500).json({ message: "Failed to update cart item" });
+    }
+  });
+
+  app.delete('/api/cart/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+      
+      await storage.removeFromCart(id, userId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error removing from cart:", error);
+      res.status(500).json({ message: "Failed to remove from cart" });
+    }
+  });
+
+  // Search routes
+  app.get('/api/search', async (req, res) => {
+    try {
+      const { q, category, minRating } = req.query;
+      const results = await storage.searchRestaurantsAndMenus({
+        query: q as string,
+        category: category as string,
+        minRating: minRating ? parseFloat(minRating as string) : undefined
+      });
+      res.json(results);
+    } catch (error) {
+      console.error("Error searching:", error);
+      res.status(500).json({ message: "Failed to search" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

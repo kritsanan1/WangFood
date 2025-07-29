@@ -199,6 +199,20 @@ export const insertReviewSchema = createInsertSchema(reviews).omit({
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
+
+// Cart Items table
+export const cartItems = pgTable("cart_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
+  userId: varchar("user_id").notNull(),
+  menuId: varchar("menu_id").notNull().references(() => menus.id, { onDelete: "cascade" }),
+  quantity: integer("quantity").notNull().default(1),
+  specialInstructions: text("special_instructions"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type CartItem = typeof cartItems.$inferSelect;
+export type InsertCartItem = typeof cartItems.$inferInsert;
 export type Restaurant = typeof restaurants.$inferSelect;  
 export type InsertRestaurant = z.infer<typeof insertRestaurantSchema>;
 export type Menu = typeof menus.$inferSelect;

@@ -5,6 +5,7 @@ import {
   orders,
   orderItems,
   reviews,
+  cartItems,
   type User,
   type UpsertUser,
   type Restaurant,
@@ -17,6 +18,8 @@ import {
   type InsertOrderItem,
   type Review,
   type InsertReview,
+  type CartItem,
+  type InsertCartItem,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, sql } from "drizzle-orm";
@@ -59,6 +62,21 @@ export interface IStorage {
   
   // Popular dishes
   getPopularDishes(): Promise<Menu[]>;
+  
+  // Cart operations
+  getUserCartItems(userId: string): Promise<(CartItem & { menu: Menu & { restaurant: Restaurant } })[]>;
+  addToCart(cartItem: InsertCartItem): Promise<CartItem>;
+  updateCartItem(id: string, userId: string, updates: Partial<InsertCartItem>): Promise<CartItem | undefined>;
+  removeFromCart(id: string, userId: string): Promise<boolean>;
+  clearUserCart(userId: string): Promise<boolean>;
+  
+  // Enhanced order operations
+  getUserOrders(userId: string): Promise<Order[]>;
+  getOrderById(id: string, userId: string): Promise<Order | undefined>;
+  createOrder(orderData: any): Promise<Order>;
+  
+  // Search operations
+  searchRestaurantsAndMenus(params: { query?: string; category?: string; minRating?: number }): Promise<{ restaurants: Restaurant[]; menus: (Menu & { restaurant: Restaurant })[] }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -228,6 +246,152 @@ export class DatabaseStorage implements IStorage {
       .groupBy(menus.id)
       .orderBy(desc(sql`COUNT(${orderItems.id})`))
       .limit(8);
+  }
+
+  // Cart operations
+  async getUserCartItems(userId: string): Promise<(CartItem & { menu: Menu & { restaurant: Restaurant } })[]> {
+    const items = await db
+      .select()
+      .from(cartItems)
+      .leftJoin(menus, eq(cartItems.menuId, menus.id))
+      .leftJoin(restaurants, eq(menus.restaurantId, restaurants.id))
+      .where(eq(cartItems.userId, userId));
+    
+    return items
+      .filter(item => item.menus && item.restaurants)
+      .map(item => ({
+        ...item.cart_items,
+        menu: {
+          ...item.menus!,
+          restaurant: item.restaurants!
+        }
+      }));
+  }
+
+  async addToCart(cartItem: InsertCartItem): Promise<CartItem> {
+    // Check if item already exists in cart, if so update quantity
+    const existing = await db
+      .select()
+      .from(cartItems)
+      .where(and(
+        eq(cartItems.userId, cartItem.userId!),
+        eq(cartItems.menuId, cartItem.menuId!)
+      ))
+      .limit(1);
+    
+    if (existing.length > 0) {
+      const [updated] = await db
+        .update(cartItems)
+        .set({
+          quantity: existing[0].quantity + (cartItem.quantity || 1),
+          updatedAt: new Date()
+        })
+        .where(eq(cartItems.id, existing[0].id))
+        .returning();
+      return updated;
+    }
+    
+    const [created] = await db.insert(cartItems).values(cartItem).returning();
+    return created;
+  }
+
+  async updateCartItem(id: string, userId: string, updates: Partial<InsertCartItem>): Promise<CartItem | undefined> {
+    const [updated] = await db
+      .update(cartItems)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(and(eq(cartItems.id, id), eq(cartItems.userId, userId)))
+      .returning();
+    return updated;
+  }
+
+  async removeFromCart(id: string, userId: string): Promise<boolean> {
+    const result = await db
+      .delete(cartItems)
+      .where(and(eq(cartItems.id, id), eq(cartItems.userId, userId)));
+    return result.rowCount !== null && result.rowCount > 0;
+  }
+
+  async clearUserCart(userId: string): Promise<boolean> {
+    const result = await db.delete(cartItems).where(eq(cartItems.userId, userId));
+    return result.rowCount !== null && result.rowCount >= 0;
+  }
+
+  // Enhanced order operations  
+  async getUserOrders(userId: string): Promise<Order[]> {
+    return await db.select().from(orders).where(eq(orders.userId, userId)).orderBy(desc(orders.createdAt));
+  }
+
+  async getOrderById(id: string, userId: string): Promise<Order | undefined> {
+    const [order] = await db
+      .select()
+      .from(orders)
+      .where(and(eq(orders.id, id), eq(orders.userId, userId)));
+    return order;
+  }
+
+  async createOrder(orderData: any): Promise<Order> {
+    const [order] = await db.insert(orders).values({
+      userId: orderData.userId,
+      restaurantId: orderData.restaurantId,
+      status: orderData.status || 'pending',
+      totalAmount: orderData.totalAmount,
+      deliveryAddress: orderData.deliveryAddress,
+      paymentMethod: orderData.paymentMethod,
+      specialInstructions: orderData.specialInstructions,
+    }).returning();
+
+    // Create order items if provided
+    if (orderData.items && orderData.items.length > 0) {
+      await db.insert(orderItems).values(
+        orderData.items.map((item: any) => ({
+          orderId: order.id,
+          menuId: item.menuId,
+          quantity: item.quantity,
+          price: item.price,
+          specialInstructions: item.specialInstructions
+        }))
+      );
+    }
+
+    return order;
+  }
+
+  // Search operations
+  async searchRestaurantsAndMenus(params: { query?: string; category?: string; minRating?: number }): Promise<{ restaurants: Restaurant[]; menus: (Menu & { restaurant: Restaurant })[] }> {
+    let restaurantQuery = db.select().from(restaurants).where(eq(restaurants.isActive, true));
+    let menuQuery = db.select().from(menus).leftJoin(restaurants, eq(menus.restaurantId, restaurants.id)).where(eq(menus.isAvailable, true));
+
+    if (params.query) {
+      const searchTerm = `%${params.query}%`;
+      restaurantQuery = restaurantQuery.where(
+        sql`${restaurants.name} ILIKE ${searchTerm} OR ${restaurants.description} ILIKE ${searchTerm} OR ${restaurants.cuisineType} ILIKE ${searchTerm}`
+      );
+      menuQuery = menuQuery.where(
+        sql`${menus.itemName} ILIKE ${searchTerm} OR ${menus.description} ILIKE ${searchTerm} OR ${menus.category} ILIKE ${searchTerm}`
+      );
+    }
+
+    if (params.category) {
+      restaurantQuery = restaurantQuery.where(sql`${restaurants.cuisineType} ILIKE ${`%${params.category}%`}`);
+      menuQuery = menuQuery.where(sql`${menus.category} ILIKE ${`%${params.category}%`}`);
+    }
+
+    if (params.minRating) {
+      restaurantQuery = restaurantQuery.where(sql`${restaurants.rating} >= ${params.minRating}`);
+    }
+
+    const restaurantResults = await restaurantQuery;
+    const menuResults = await menuQuery;
+
+    return {
+      restaurants: restaurantResults,
+      menus: menuResults
+        .filter(result => result.restaurants)
+        .map(result => ({
+          ...result.menus!,
+          restaurant: result.restaurants!
+        }))
+    };
   }
 }
 

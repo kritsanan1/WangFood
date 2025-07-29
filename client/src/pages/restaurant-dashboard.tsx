@@ -1,550 +1,406 @@
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { useState, useEffect } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ShoppingBag, TrendingUp, Star, Plus, Edit, Trash2 } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { 
+  Clock, 
+  CheckCircle, 
+  ChefHat, 
+  Package,
+  Truck,
+  TrendingUp,
+  DollarSign,
+  Users,
+  Settings,
+  ArrowLeft
+} from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { isUnauthorizedError } from "@/lib/authUtils";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { insertMenuSchema } from "@shared/schema";
-import type { Order, Menu } from "@shared/schema";
-import { z } from "zod";
+import type { Order, OrderItem } from "@shared/schema";
 
-const menuFormSchema = insertMenuSchema.extend({
-  price: z.number().min(1, "ราคาต้องมากกว่า 0"),
-});
-
-type MenuFormData = z.infer<typeof menuFormSchema>;
+interface OrderWithDetails extends Order {
+  items: (OrderItem & { 
+    menu: { 
+      itemName: string; 
+      imageUrl?: string; 
+    } 
+  })[];
+  customer: {
+    name: string;
+    phone?: string;
+  };
+}
 
 export default function RestaurantDashboard() {
+  const { isAuthenticated, user } = useAuth();
   const { toast } = useToast();
-  const { isAuthenticated, isLoading } = useAuth();
-  const [isMenuDialogOpen, setIsMenuDialogOpen] = useState(false);
-  const [editingMenu, setEditingMenu] = useState<Menu | null>(null);
+  const queryClient = useQueryClient();
+  const [activeTab, setActiveTab] = useState("orders");
 
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      toast({
-        title: "Unauthorized",
-        description: "You are logged out. Logging in again...",
-        variant: "destructive",
-      });
-      setTimeout(() => {
-        window.location.href = "/api/login";
-      }, 500);
-      return;
-    }
-  }, [isAuthenticated, isLoading, toast]);
-
-  const { data: orders, isLoading: ordersLoading, error: ordersError } = useQuery<Order[]>({
-    queryKey: ["/api/restaurant/orders"],
-    enabled: isAuthenticated,
-    retry: false,
+  // Fetch restaurant orders
+  const { data: orders = [], isLoading } = useQuery<OrderWithDetails[]>({
+    queryKey: ['/api/restaurant/orders'],
+    enabled: isAuthenticated
   });
 
-  const { data: restaurants } = useQuery({
-    queryKey: ["/api/restaurants"],
-    enabled: isAuthenticated,
-  });
-
-  const { data: menus, isLoading: menusLoading } = useQuery<Menu[]>({
-    queryKey: ["/api/restaurants", restaurants?.[0]?.id, "menus"],
-    enabled: !!restaurants?.[0]?.id,
-  });
-
-  const form = useForm<MenuFormData>({
-    resolver: zodResolver(menuFormSchema),
-    defaultValues: {
-      itemName: "",
-      description: "",
-      price: 0,
-      category: "อาหารไทย",
-      imageUrl: "",
-      isAvailable: true,
-    },
-  });
-
-  const createMenuMutation = useMutation({
-    mutationFn: async (data: MenuFormData) => {
-      if (!restaurants?.[0]?.id) throw new Error("No restaurant found");
-      await apiRequest("POST", `/api/restaurants/${restaurants[0].id}/menus`, data);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/restaurants", restaurants?.[0]?.id, "menus"] });
-      setIsMenuDialogOpen(false);
-      form.reset();
-      toast({
-        title: "สำเร็จ",
-        description: "เพิ่มเมนูใหม่เรียบร้อยแล้ว",
-      });
-    },
-    onError: (error) => {
-      if (isUnauthorizedError(error as Error)) {
-        toast({
-          title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/api/login";
-        }, 500);
-        return;
-      }
-      toast({
-        title: "เกิดข้อผิดพลาด",
-        description: "ไม่สามารถเพิ่มเมนูได้",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const updateMenuMutation = useMutation({
-    mutationFn: async (data: MenuFormData) => {
-      if (!editingMenu) throw new Error("No menu to update");
-      await apiRequest("PUT", `/api/menus/${editingMenu.id}`, data);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/restaurants", restaurants?.[0]?.id, "menus"] });
-      setIsMenuDialogOpen(false);
-      setEditingMenu(null);
-      form.reset();
-      toast({
-        title: "สำเร็จ",
-        description: "แก้ไขเมนูเรียบร้อยแล้ว",
-      });
-    },
-    onError: (error) => {
-      if (isUnauthorizedError(error as Error)) {
-        toast({
-          title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/api/login";
-        }, 500);
-        return;
-      }
-      toast({
-        title: "เกิดข้อผิดพลาด",
-        description: "ไม่สามารถแก้ไขเมนูได้",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const deleteMenuMutation = useMutation({
-    mutationFn: async (menuId: string) => {
-      await apiRequest("DELETE", `/api/menus/${menuId}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/restaurants", restaurants?.[0]?.id, "menus"] });
-      toast({
-        title: "สำเร็จ",
-        description: "ลบเมนูเรียบร้อยแล้ว",
-      });
-    },
-    onError: (error) => {
-      if (isUnauthorizedError(error as Error)) {
-        toast({
-          title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/api/login";
-        }, 500);
-        return;
-      }
-      toast({
-        title: "เกิดข้อผิดพลาด",
-        description: "ไม่สามารถลบเมนูได้",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const updateOrderStatusMutation = useMutation({
+  // Update order status mutation
+  const updateOrderMutation = useMutation({
     mutationFn: async ({ orderId, status }: { orderId: string; status: string }) => {
-      await apiRequest("PUT", `/api/orders/${orderId}/status`, { status });
+      return await apiRequest(`/api/orders/${orderId}/status`, 'PUT', { status });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/restaurant/orders"] });
+      queryClient.invalidateQueries({ queryKey: ['/api/restaurant/orders'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/orders'] });
       toast({
-        title: "สำเร็จ",
-        description: "อัปเดตสถานะออเดอร์เรียบร้อยแล้ว",
+        title: "อัปเดตสถานะแล้ว",
+        description: "สถานะออเดอร์ได้รับการอัปเดตเรียบร้อย",
       });
     },
-    onError: (error) => {
-      if (isUnauthorizedError(error as Error)) {
-        toast({
-          title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/api/login";
-        }, 500);
-        return;
-      }
+    onError: () => {
       toast({
         title: "เกิดข้อผิดพลาด",
-        description: "ไม่สามารถอัปเดตสถานะได้",
+        description: "ไม่สามารถอัปเดตสถานะออเดอร์ได้",
         variant: "destructive",
       });
     },
   });
 
-  useEffect(() => {
-    if (ordersError && isUnauthorizedError(ordersError as Error)) {
-      toast({
-        title: "Unauthorized",
-        description: "You are logged out. Logging in again...",
-        variant: "destructive",
-      });
-      setTimeout(() => {
-        window.location.href = "/api/login";
-      }, 500);
-      return;
-    }
-  }, [ordersError, toast]);
-
-  const onSubmit = (data: MenuFormData) => {
-    if (editingMenu) {
-      updateMenuMutation.mutate(data);
-    } else {
-      createMenuMutation.mutate(data);
+  const getStatusInfo = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return { 
+          label: 'รอยืนยัน', 
+          color: 'bg-yellow-500', 
+          icon: Clock,
+          nextStatus: 'confirmed',
+          nextLabel: 'ยืนยัน'
+        };
+      case 'confirmed':
+        return { 
+          label: 'ยืนยันแล้ว', 
+          color: 'bg-blue-500', 
+          icon: CheckCircle,
+          nextStatus: 'preparing',
+          nextLabel: 'เริ่มทำ'
+        };
+      case 'preparing':
+        return { 
+          label: 'กำลังเตรียม', 
+          color: 'bg-orange-500', 
+          icon: ChefHat,
+          nextStatus: 'ready',
+          nextLabel: 'พร้อม'
+        };
+      case 'ready':
+        return { 
+          label: 'พร้อมส่ง', 
+          color: 'bg-purple-500', 
+          icon: Package,
+          nextStatus: 'delivering',
+          nextLabel: 'ส่งแล้ว'
+        };
+      case 'delivering':
+        return { 
+          label: 'กำลังส่ง', 
+          color: 'bg-indigo-500', 
+          icon: Truck,
+          nextStatus: 'delivered',
+          nextLabel: 'ส่งเสร็จ'
+        };
+      case 'delivered':
+        return { 
+          label: 'ส่งแล้ว', 
+          color: 'bg-green-500', 
+          icon: CheckCircle,
+          nextStatus: null,
+          nextLabel: null
+        };
+      case 'cancelled':
+        return { 
+          label: 'ยกเลิก', 
+          color: 'bg-red-500', 
+          icon: Clock,
+          nextStatus: null,
+          nextLabel: null
+        };
+      default:
+        return { 
+          label: 'ไม่ทราบสถานะ', 
+          color: 'bg-gray-500', 
+          icon: Clock,
+          nextStatus: null,
+          nextLabel: null
+        };
     }
   };
 
-  const handleEditMenu = (menu: Menu) => {
-    setEditingMenu(menu);
-    form.reset({
-      itemName: menu.itemName,
-      description: menu.description || "",
-      price: menu.price,
-      category: menu.category || "อาหารไทย",
-      imageUrl: menu.imageUrl || "",
-      isAvailable: menu.isAvailable,
+  const formatDateTime = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('th-TH', {
+      day: '2-digit',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit'
     });
-    setIsMenuDialogOpen(true);
   };
 
-  const handleDeleteMenu = (menuId: string) => {
-    if (confirm("คุณแน่ใจหรือไม่ที่จะลบเมนูนี้?")) {
-      deleteMenuMutation.mutate(menuId);
-    }
-  };
+  const pendingOrders = orders.filter(order => ['pending', 'confirmed', 'preparing', 'ready'].includes(order.status));
+  const todayRevenue = orders
+    .filter(order => {
+      const today = new Date().toDateString();
+      const orderDate = new Date(order.createdAt).toDateString();
+      return orderDate === today && order.status === 'delivered';
+    })
+    .reduce((sum, order) => sum + order.totalAmount, 0);
 
-  const todayOrders = orders?.filter(order => {
-    const today = new Date();
-    const orderDate = new Date(order.createdAt);
-    return orderDate.toDateString() === today.toDateString();
-  }) || [];
-
-  const todayRevenue = todayOrders.reduce((sum, order) => sum + order.totalAmount, 0);
-
-  if (isLoading) {
+  if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-tourderwang-background font-thai">
-        <Navbar onCartClick={() => {}} />
-        <div className="animate-pulse max-w-7xl mx-auto px-4 py-8">
-          <div className="h-8 bg-gray-300 rounded mb-8" />
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            {[...Array(3)].map((_, i) => (
-              <div key={i} className="h-24 bg-gray-300 rounded" />
-            ))}
-          </div>
-        </div>
+      <div className="min-h-screen bg-tourderwang-background flex items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardContent className="p-8 text-center">
+            <div className="w-16 h-16 mx-auto mb-4 bg-orange-100 rounded-full flex items-center justify-center">
+              <Settings className="w-8 h-8 text-orange-500" />
+            </div>
+            <h2 className="text-xl font-bold text-gray-900 mb-2">เข้าสู่ระบบเพื่อจัดการร้าน</h2>
+            <p className="text-gray-600 mb-6">กรุณาเข้าสู่ระบบเพื่อเข้าใช้แดชบอร์ดร้านอาหาร</p>
+            <Button 
+              onClick={() => window.location.href = "/api/login"}
+              className="w-full bg-[#FF6B35] hover:bg-[#E55A2B] text-white"
+            >
+              เข้าสู่ระบบ
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-tourderwang-background font-thai">
-      <Navbar onCartClick={() => {}} />
-      
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold text-gray-900">แดชบอร์ดร้านอาหาร</h1>
-          <p className="text-gray-600">จัดการเมนูและออเดอร์ของร้าน</p>
-        </div>
-        
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <ShoppingBag className="h-8 w-8 text-tourderwang-primary" />
-                </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-500">ออเดอร์วันนี้</p>
-                  <p className="text-2xl font-semibold text-gray-900">{todayOrders.length}</p>
-                </div>
+    <div className="min-h-screen bg-tourderwang-background">
+      {/* Header */}
+      <div className="bg-white shadow-sm border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <Button
+                variant="ghost"
+                onClick={() => window.location.href = "/"}
+                className="p-2"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </Button>
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">แดชบอร์ดร้านอาหาร</h1>
+                <p className="text-gray-600">จัดการออเดอร์และติดตามยอดขาย</p>
               </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <TrendingUp className="h-8 w-8 text-tourderwang-secondary" />
-                </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-500">ยอดขายวันนี้</p>
-                  <p className="text-2xl font-semibold text-gray-900">{todayRevenue.toLocaleString()} บาท</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <Star className="h-8 w-8 text-yellow-500" />
-                </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-500">คะแนนเฉลี่ย</p>
-                  <p className="text-2xl font-semibold text-gray-900">{restaurants?.[0]?.rating || "0.0"}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </div>
-        
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* New Orders */}
-          <Card>
-            <CardHeader>
-              <CardTitle>ออเดอร์ใหม่</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {ordersLoading ? (
-                <div className="space-y-4">
-                  {[...Array(3)].map((_, i) => (
-                    <div key={i} className="h-16 bg-gray-200 rounded animate-pulse" />
-                  ))}
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {orders?.filter(order => order.status === "pending").slice(0, 5).map((order) => (
-                    <div key={order.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                      <div>
-                        <p className="font-medium">#{order.id.slice(-8)}</p>
-                        <p className="text-sm text-gray-600">{order.totalAmount} บาท</p>
-                        <p className="text-sm text-gray-500">
-                          {new Date(order.createdAt).toLocaleTimeString('th-TH')}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <Badge className="mb-2">{order.status}</Badge>
-                        <Button
-                          size="sm"
-                          className="tourderwang-secondary text-white hover:bg-green-600"
-                          onClick={() => updateOrderStatusMutation.mutate({ orderId: order.id, status: "confirmed" })}
-                          disabled={updateOrderStatusMutation.isPending}
-                        >
-                          รับออเดอร์
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                  {orders?.filter(order => order.status === "pending").length === 0 && (
-                    <p className="text-center text-gray-500 py-8">ไม่มีออเดอร์ใหม่</p>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-          
-          {/* Menu Management */}
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>จัดการเมนู</CardTitle>
-              <Dialog open={isMenuDialogOpen} onOpenChange={setIsMenuDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button 
-                    className="tourderwang-primary text-white hover:bg-orange-600"
-                    onClick={() => {
-                      setEditingMenu(null);
-                      form.reset();
-                    }}
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    เพิ่มเมนูใหม่
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-md">
-                  <DialogHeader>
-                    <DialogTitle>{editingMenu ? "แก้ไขเมนู" : "เพิ่มเมนูใหม่"}</DialogTitle>
-                  </DialogHeader>
-                  <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                      <FormField
-                        control={form.control}
-                        name="itemName"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>ชื่อเมนู</FormLabel>
-                            <FormControl>
-                              <Input placeholder="ชื่อเมนู" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={form.control}
-                        name="description"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>รายละเอียด</FormLabel>
-                            <FormControl>
-                              <Textarea placeholder="รายละเอียดเมนู" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={form.control}
-                        name="price"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>ราคา (บาท)</FormLabel>
-                            <FormControl>
-                              <Input 
-                                type="number" 
-                                placeholder="0" 
-                                {...field}
-                                onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={form.control}
-                        name="category"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>หมวดหมู่</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="เลือกหมวดหมู่" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="อาหารไทย">อาหารไทย</SelectItem>
-                                <SelectItem value="เครื่องดื่ม">เครื่องดื่ม</SelectItem>
-                                <SelectItem value="ของหวาน">ของหวาน</SelectItem>
-                                <SelectItem value="อาหารฝรั่ง">อาหารฝรั่ง</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={form.control}
-                        name="imageUrl"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>รูปภาพ (URL)</FormLabel>
-                            <FormControl>
-                              <Input placeholder="https://..." {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <div className="flex justify-end space-x-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => setIsMenuDialogOpen(false)}
-                        >
-                          ยกเลิก
-                        </Button>
-                        <Button 
-                          type="submit"
-                          className="tourderwang-primary text-white hover:bg-orange-600"
-                          disabled={createMenuMutation.isPending || updateMenuMutation.isPending}
-                        >
-                          {editingMenu ? "บันทึก" : "เพิ่มเมนู"}
-                        </Button>
-                      </div>
-                    </form>
-                  </Form>
-                </DialogContent>
-              </Dialog>
-            </CardHeader>
-            <CardContent>
-              {menusLoading ? (
-                <div className="space-y-3">
-                  {[...Array(5)].map((_, i) => (
-                    <div key={i} className="h-12 bg-gray-200 rounded animate-pulse" />
-                  ))}
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {menus?.slice(0, 10).map((menu) => (
-                    <div key={menu.id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
-                      <div>
-                        <p className="font-medium">{menu.itemName}</p>
-                        <p className="text-sm text-tourderwang-primary">{menu.price} บาท</p>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleEditMenu(menu)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleDeleteMenu(menu.id)}
-                          disabled={deleteMenuMutation.isPending}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                  {menus?.length === 0 && (
-                    <p className="text-center text-gray-500 py-8">ยังไม่มีเมนู</p>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      </main>
+      </div>
 
-      <Footer />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">ออเดอร์รอดำเนินการ</p>
+                  <p className="text-2xl font-bold text-gray-900">{pendingOrders.length}</p>
+                </div>
+                <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center">
+                  <Clock className="w-6 h-6 text-yellow-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">ออเดอร์ทั้งหมดวันนี้</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {orders.filter(order => {
+                      const today = new Date().toDateString();
+                      const orderDate = new Date(order.createdAt).toDateString();
+                      return orderDate === today;
+                    }).length}
+                  </p>
+                </div>
+                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                  <Package className="w-6 h-6 text-blue-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">รายได้วันนี้</p>
+                  <p className="text-2xl font-bold text-gray-900">฿{todayRevenue.toFixed(0)}</p>
+                </div>
+                <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                  <DollarSign className="w-6 h-6 text-green-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">ลูกค้าใหม่</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {new Set(orders.map(order => order.userId)).size}
+                  </p>
+                </div>
+                <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
+                  <Users className="w-6 h-6 text-purple-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Orders Management */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="orders">จัดการออเดอร์</TabsTrigger>
+            <TabsTrigger value="analytics">รายงาน</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="orders" className="space-y-6">
+            {isLoading ? (
+              <div className="space-y-4">
+                {[...Array(5)].map((_, i) => (
+                  <Card key={i} className="animate-pulse">
+                    <CardContent className="p-6">
+                      <div className="flex items-center space-x-4">
+                        <div className="w-12 h-12 bg-gray-200 rounded-lg"></div>
+                        <div className="flex-1 space-y-2">
+                          <div className="h-4 bg-gray-200 rounded w-1/4"></div>
+                          <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+                          <div className="h-3 bg-gray-200 rounded w-1/3"></div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : orders.length === 0 ? (
+              <div className="text-center py-16">
+                <div className="w-24 h-24 mx-auto mb-6 bg-gray-100 rounded-full flex items-center justify-center">
+                  <Package className="w-12 h-12 text-gray-400" />
+                </div>
+                <h2 className="text-2xl font-bold text-gray-900 mb-2">ยังไม่มีออเดอร์</h2>
+                <p className="text-gray-600">เมื่อมีลูกค้าสั่งอาหาร ออเดอร์จะแสดงที่นี่</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {orders.map((order) => {
+                  const statusInfo = getStatusInfo(order.status);
+                  const StatusIcon = statusInfo.icon;
+                  
+                  return (
+                    <Card key={order.id} className="overflow-hidden">
+                      <CardHeader className="pb-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <CardTitle className="text-lg">
+                              ออเดอร์ #{order.id.slice(-8).toUpperCase()}
+                            </CardTitle>
+                            <p className="text-sm text-gray-600">
+                              {formatDateTime(order.createdAt)} • ฿{order.totalAmount.toFixed(0)}
+                            </p>
+                          </div>
+                          <Badge className={`${statusInfo.color} text-white px-3 py-1`}>
+                            <StatusIcon className="w-4 h-4 mr-1" />
+                            {statusInfo.label}
+                          </Badge>
+                        </div>
+                      </CardHeader>
+
+                      <CardContent className="space-y-4">
+                        {/* Order Items */}
+                        <div>
+                          <h4 className="font-medium text-gray-900 mb-2">รายการอาหาร</h4>
+                          <div className="space-y-2">
+                            {order.items.map((item) => (
+                              <div key={item.id} className="flex items-center justify-between text-sm">
+                                <div className="flex items-center space-x-2">
+                                  <span className="font-medium">{item.menu.itemName}</span>
+                                  <span className="text-gray-600">x{item.quantity}</span>
+                                </div>
+                                <span className="font-medium">฿{(item.price * item.quantity).toFixed(0)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        <Separator />
+
+                        {/* Customer Info & Actions */}
+                        <div className="flex items-center justify-between">
+                          <div className="text-sm">
+                            <p className="font-medium text-gray-900">ส่งที่:</p>
+                            <p className="text-gray-600">{order.deliveryAddress}</p>
+                          </div>
+                          
+                          <div className="flex space-x-2">
+                            {statusInfo.nextStatus && statusInfo.nextLabel && (
+                              <Button
+                                onClick={() => updateOrderMutation.mutate({
+                                  orderId: order.id,
+                                  status: statusInfo.nextStatus!
+                                })}
+                                disabled={updateOrderMutation.isPending}
+                                className="bg-[#FF6B35] hover:bg-[#E55A2B] text-white"
+                              >
+                                {statusInfo.nextLabel}
+                              </Button>
+                            )}
+                            {order.status === 'pending' && (
+                              <Button
+                                variant="outline"
+                                onClick={() => updateOrderMutation.mutate({
+                                  orderId: order.id,
+                                  status: 'cancelled'
+                                })}
+                                disabled={updateOrderMutation.isPending}
+                                className="text-red-600 border-red-300 hover:bg-red-50"
+                              >
+                                ยกเลิก
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="analytics" className="space-y-6">
+            <div className="text-center py-16">
+              <div className="w-24 h-24 mx-auto mb-6 bg-gray-100 rounded-full flex items-center justify-center">
+                <TrendingUp className="w-12 h-12 text-gray-400" />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">รายงานการขาย</h2>
+              <p className="text-gray-600 mb-6">ฟีเจอร์นี้จะเปิดใช้งานเร็วๆ นี้</p>
+            </div>
+          </TabsContent>
+        </Tabs>
+      </div>
     </div>
   );
 }
