@@ -47,10 +47,8 @@ export default function Footer() {
             <h4 className="font-semibold mb-4">บริการ</h4>
             <ul className="space-y-2">
               <li>
-                <Link href="/">
-                  <a className="text-gray-300 hover:text-tourderwang-primary transition-colors">
-                    สั่งอาหาร
-                  </a>
+                <Link href="/" className="text-gray-300 hover:text-tourderwang-primary transition-colors">
+                  สั่งอาหาร
                 </Link>
               </li>
               <li>
@@ -62,10 +60,8 @@ export default function Footer() {
                 </a>
               </li>
               <li>
-                <Link href="/dashboard">
-                  <a className="text-gray-300 hover:text-tourderwang-primary transition-colors">
-                    สำหรับร้านอาหาร
-                  </a>
+                <Link href="/dashboard" className="text-gray-300 hover:text-tourderwang-primary transition-colors">
+                  สำหรับร้านอาหาร
                 </Link>
               </li>
               <li>

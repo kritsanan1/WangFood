@@ -8,6 +8,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Search, ShoppingCart, Menu, User, Settings, LogOut } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import logoPath from "@assets/logo_1753786889875.png";
+import type { User as UserType } from "@shared/schema";
 
 interface NavbarProps {
   onCartClick: () => void;
@@ -16,6 +17,7 @@ interface NavbarProps {
 export default function Navbar({ onCartClick }: NavbarProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { user } = useAuth();
+  const typedUser = user as UserType | undefined;
 
   return (
     <nav className="bg-white shadow-md sticky top-0 z-50 font-thai">
@@ -63,13 +65,13 @@ export default function Navbar({ onCartClick }: NavbarProps) {
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="flex items-center space-x-2">
                     <Avatar className="h-8 w-8">
-                      <AvatarImage src={user?.profileImageUrl || ""} />
+                      <AvatarImage src={typedUser?.profileImageUrl || ""} />
                       <AvatarFallback>
                         <User className="h-4 w-4" />
                       </AvatarFallback>
                     </Avatar>
                     <span className="text-sm font-medium">
-                      {user?.firstName || "ผู้ใช้"}
+                      {typedUser?.firstName || "ผู้ใช้"}
                     </span>
                   </Button>
                 </DropdownMenuTrigger>
