@@ -28,6 +28,7 @@ import { eq, desc, and, sql } from "drizzle-orm";
 export interface IStorage {
   // User operations (mandatory for Replit Auth)
   getUser(id: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
   
   // Restaurant operations
@@ -74,6 +75,7 @@ export interface IStorage {
   getUserOrders(userId: string): Promise<Order[]>;
   getOrderById(id: string, userId: string): Promise<Order | undefined>;
   createOrder(orderData: any): Promise<Order>;
+  createOrderFromCart(order: InsertOrder): Promise<Order>;
   
   // Search operations
   searchRestaurantsAndMenus(params: { query?: string; category?: string; minRating?: number }): Promise<{ restaurants: Restaurant[]; menus: (Menu & { restaurant: Restaurant })[] }>;
@@ -83,6 +85,11 @@ export class DatabaseStorage implements IStorage {
   // User operations (mandatory for Replit Auth)
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.email, email));
     return user;
   }
 
@@ -155,7 +162,7 @@ export class DatabaseStorage implements IStorage {
   
   async deleteMenu(id: string): Promise<boolean> {
     const result = await db.delete(menus).where(eq(menus.id, id));
-    return result.rowCount > 0;
+    return (result.rowCount ?? 0) > 0;
   }
   
   // Order operations
@@ -176,7 +183,7 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(orders).where(eq(orders.restaurantId, restaurantId)).orderBy(desc(orders.createdAt));
   }
   
-  async createOrder(order: InsertOrder): Promise<Order> {
+  async createOrderFromCart(order: InsertOrder): Promise<Order> {
     const [newOrder] = await db.insert(orders).values(order).returning();
     return newOrder;
   }
@@ -331,13 +338,14 @@ export class DatabaseStorage implements IStorage {
 
   async createOrder(orderData: any): Promise<Order> {
     const [order] = await db.insert(orders).values({
-      userId: orderData.userId,
       restaurantId: orderData.restaurantId,
-      status: orderData.status || 'pending',
+      userId: orderData.userId,
       totalAmount: orderData.totalAmount,
+      deliveryFee: orderData.deliveryFee || 0,
+      status: orderData.status || 'pending',
       deliveryAddress: orderData.deliveryAddress,
-      paymentMethod: orderData.paymentMethod,
-      specialInstructions: orderData.specialInstructions,
+      customerNote: orderData.customerNote,
+      estimatedDeliveryTime: orderData.estimatedDeliveryTime,
     }).returning();
 
     // Create order items if provided
@@ -358,30 +366,33 @@ export class DatabaseStorage implements IStorage {
 
   // Search operations
   async searchRestaurantsAndMenus(params: { query?: string; category?: string; minRating?: number }): Promise<{ restaurants: Restaurant[]; menus: (Menu & { restaurant: Restaurant })[] }> {
-    let restaurantQuery = db.select().from(restaurants).where(eq(restaurants.isActive, true));
-    let menuQuery = db.select().from(menus).leftJoin(restaurants, eq(menus.restaurantId, restaurants.id)).where(eq(menus.isAvailable, true));
+    const baseRestaurantQuery = db.select().from(restaurants);
+    const baseMenuQuery = db.select().from(menus).leftJoin(restaurants, eq(menus.restaurantId, restaurants.id));
+
+    let restaurantConditions = [eq(restaurants.isActive, true)];
+    let menuConditions = [eq(menus.isAvailable, true)];
 
     if (params.query) {
       const searchTerm = `%${params.query}%`;
-      restaurantQuery = restaurantQuery.where(
+      restaurantConditions.push(
         sql`${restaurants.name} ILIKE ${searchTerm} OR ${restaurants.description} ILIKE ${searchTerm} OR ${restaurants.cuisineType} ILIKE ${searchTerm}`
       );
-      menuQuery = menuQuery.where(
+      menuConditions.push(
         sql`${menus.itemName} ILIKE ${searchTerm} OR ${menus.description} ILIKE ${searchTerm} OR ${menus.category} ILIKE ${searchTerm}`
       );
     }
 
     if (params.category) {
-      restaurantQuery = restaurantQuery.where(sql`${restaurants.cuisineType} ILIKE ${`%${params.category}%`}`);
-      menuQuery = menuQuery.where(sql`${menus.category} ILIKE ${`%${params.category}%`}`);
+      restaurantConditions.push(sql`${restaurants.cuisineType} ILIKE ${`%${params.category}%`}`);
+      menuConditions.push(sql`${menus.category} ILIKE ${`%${params.category}%`}`);
     }
 
     if (params.minRating) {
-      restaurantQuery = restaurantQuery.where(sql`${restaurants.rating} >= ${params.minRating}`);
+      restaurantConditions.push(sql`${restaurants.rating} >= ${params.minRating}`);
     }
 
-    const restaurantResults = await restaurantQuery;
-    const menuResults = await menuQuery;
+    const restaurantResults = await baseRestaurantQuery.where(and(...restaurantConditions));
+    const menuResults = await baseMenuQuery.where(and(...menuConditions));
 
     return {
       restaurants: restaurantResults,

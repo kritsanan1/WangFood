@@ -36,6 +36,10 @@ export const users = pgTable("users", {
   phone: varchar("phone"),
   address: text("address"),
   subscriptionStatus: varchar("subscription_status").default("free"),
+  stripeCustomerId: varchar("stripe_customer_id"),
+  stripeSubscriptionId: varchar("stripe_subscription_id"),
+  googleId: varchar("google_id"),
+  lineUserId: varchar("line_user_id"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -77,6 +81,9 @@ export const orders = pgTable("orders", {
   totalAmount: integer("total_amount").notNull(),
   deliveryFee: integer("delivery_fee").default(0),
   status: varchar("status").default("pending"), // pending, confirmed, preparing, delivering, delivered, cancelled
+  paymentMethod: varchar("payment_method").default("cash"), // cash, stripe, line_pay
+  paymentStatus: varchar("payment_status").default("pending"), // pending, paid, failed, refunded
+  stripePaymentIntentId: varchar("stripe_payment_intent_id"),
   deliveryAddress: text("delivery_address").notNull(),
   customerNote: text("customer_note"),
   estimatedDeliveryTime: timestamp("estimated_delivery_time"),

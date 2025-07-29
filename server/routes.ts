@@ -2,12 +2,18 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
+import { setupGoogleAuth } from "./googleAuth";
+import { lineService } from "./line";
+import { stripeService, stripe } from "./stripe";
+import { qrCodeService } from "./qrcode";
+import passport from "passport";
 import { insertRestaurantSchema, insertMenuSchema, insertOrderSchema, insertOrderItemSchema, insertReviewSchema } from "@shared/schema";
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
+  setupGoogleAuth();
 
   // Auth routes
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
@@ -18,6 +24,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  // Google OAuth routes
+  app.get('/api/auth/google', 
+    passport.authenticate('google', { scope: ['profile', 'email'] })
+  );
+
+  app.get('/api/auth/google/callback',
+    passport.authenticate('google', { failureRedirect: '/login?error=google_auth_failed' }),
+    (req, res) => {
+      res.redirect('/'); // Redirect to home after successful login
+    }
+  );
+
+  // LINE OAuth routes
+  app.get('/api/auth/line', (req, res) => {
+    const authUrl = lineService.getAuthUrl();
+    res.redirect(authUrl);
+  });
+
+  app.get('/api/auth/line/callback', async (req, res) => {
+    try {
+      const { code, state } = req.query;
+      
+      if (!code || state !== 'line_login') {
+        return res.redirect('/login?error=line_auth_failed');
+      }
+
+      const tokenResponse = await lineService.exchangeCodeForToken(code as string);
+      const profile = await lineService.getProfile(tokenResponse.access_token);
+
+      // Create or update user with LINE info
+      const user = await storage.upsertUser({
+        id: profile.userId,
+        lineUserId: profile.userId,
+        firstName: profile.displayName,
+        profileImageUrl: profile.pictureUrl,
+      });
+
+      // Create session for LINE user
+      req.login(user, (err) => {
+        if (err) {
+          console.error('Session creation error:', err);
+          return res.redirect('/login?error=session_failed');
+        }
+        res.redirect('/');
+      });
+    } catch (error) {
+      console.error('LINE auth error:', error);
+      res.redirect('/login?error=line_auth_failed');
     }
   });
 
@@ -323,6 +380,128 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error searching:", error);
       res.status(500).json({ message: "Failed to search" });
+    }
+  });
+
+  // Advanced Payment Routes - Stripe Integration
+  app.post('/api/create-payment-intent', isAuthenticated, async (req: any, res) => {
+    try {
+      const { amount, orderId, paymentMethod = 'stripe' } = req.body;
+      const userId = req.user.claims.sub;
+
+      const paymentIntent = await stripeService.createPaymentIntent(
+        amount,
+        'thb',
+        { orderId, userId, paymentMethod }
+      );
+
+      res.json({ 
+        clientSecret: paymentIntent.client_secret,
+        paymentIntentId: paymentIntent.id
+      });
+    } catch (error: any) {
+      console.error('Payment intent creation error:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post('/api/confirm-payment', isAuthenticated, async (req: any, res) => {
+    try {
+      const { paymentIntentId, orderId } = req.body;
+      
+      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+      
+      if (paymentIntent.status === 'succeeded') {
+        // Update order payment status
+        await storage.updateOrderStatus(orderId, 'confirmed');
+        
+        // Send LINE notification if user has LINE ID
+        const userId = req.user.claims.sub;
+        const user = await storage.getUser(userId);
+        const order = await storage.getOrder(orderId);
+        
+        if (user?.lineUserId && order) {
+          await lineService.sendOrderNotification(user.lineUserId, {
+            id: order.id,
+            restaurantName: 'Restaurant',
+            totalAmount: order.totalAmount,
+            status: order.status
+          });
+        }
+        
+        res.json({ success: true, status: 'confirmed' });
+      } else {
+        res.json({ success: false, status: paymentIntent.status });
+      }
+    } catch (error: any) {
+      console.error('Payment confirmation error:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // QR Code generation routes
+  app.get('/api/qr/payment/:orderId', isAuthenticated, async (req: any, res) => {
+    try {
+      const { orderId } = req.params;
+      const { method = 'stripe', amount } = req.query;
+      
+      const qrCode = await qrCodeService.generatePaymentQR({
+        amount: parseFloat(amount as string),
+        orderId,
+        restaurantName: 'Tourderwang',
+        paymentMethod: method as 'promptpay' | 'truewallet' | 'stripe'
+      });
+      
+      res.json({ qrCode });
+    } catch (error: any) {
+      console.error('QR generation error:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get('/api/qr/table/:restaurantId/:tableNumber', async (req, res) => {
+    try {
+      const { restaurantId, tableNumber } = req.params;
+      const qrCode = await qrCodeService.generateTableQR(restaurantId, tableNumber);
+      res.json({ qrCode });
+    } catch (error: any) {
+      console.error('Table QR generation error:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get('/api/qr/track/:orderId', async (req, res) => {
+    try {
+      const { orderId } = req.params;
+      const qrCode = await qrCodeService.generateOrderTrackingQR(orderId);
+      res.json({ qrCode });
+    } catch (error: any) {
+      console.error('Tracking QR generation error:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // LINE notification routes
+  app.post('/api/notify/order-update', isAuthenticated, async (req: any, res) => {
+    try {
+      const { orderId, status } = req.body;
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      const order = await storage.getOrder(orderId);
+      
+      if (user?.lineUserId && order) {
+        await lineService.sendDeliveryUpdate(user.lineUserId, {
+          id: order.id,
+          status,
+          estimatedDeliveryTime: order.estimatedDeliveryTime
+        });
+        res.json({ success: true });
+      } else {
+        res.status(400).json({ message: 'User does not have LINE integration' });
+      }
+    } catch (error: any) {
+      console.error('LINE notification error:', error);
+      res.status(500).json({ message: error.message });
     }
   });
 
