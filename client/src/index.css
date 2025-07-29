@@ -1,0 +1,111 @@
+@import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: hsl(0, 0%, 100%);
+  --foreground: hsl(210, 9%, 17%);
+  --muted: hsl(210, 40%, 96%);
+  --muted-foreground: hsl(215, 16%, 47%);
+  --popover: hsl(0, 0%, 100%);
+  --popover-foreground: hsl(210, 9%, 17%);
+  --card: hsl(0, 0%, 100%);
+  --card-foreground: hsl(210, 9%, 17%);
+  --border: hsl(214, 32%, 91%);
+  --input: hsl(214, 32%, 91%);
+  --primary: hsl(12, 100%, 62%);
+  --primary-foreground: hsl(0, 0%, 98%);
+  --secondary: hsl(153, 60%, 53%);
+  --secondary-foreground: hsl(210, 9%, 17%);
+  --accent: hsl(204, 94%, 94%);
+  --accent-foreground: hsl(210, 9%, 17%);
+  --destructive: hsl(0, 84%, 60%);
+  --destructive-foreground: hsl(60, 9%, 98%);
+  --ring: hsl(210, 9%, 17%);
+  --radius: 0.5rem;
+  
+  /* Thai app specific colors */
+  --tourderwang-primary: hsl(12, 100%, 62%);
+  --tourderwang-secondary: hsl(153, 60%, 53%);
+  --tourderwang-accent: hsl(204, 70%, 53%);
+  --tourderwang-warning: hsl(0, 84%, 60%);
+  --tourderwang-text: hsl(210, 9%, 17%);
+  --tourderwang-background: hsl(210, 40%, 98%);
+}
+
+.dark {
+  --background: hsl(240, 10%, 4%);
+  --foreground: hsl(0, 0%, 98%);
+  --muted: hsl(240, 4%, 16%);
+  --muted-foreground: hsl(240, 5%, 65%);
+  --popover: hsl(240, 10%, 4%);
+  --popover-foreground: hsl(0, 0%, 98%);
+  --card: hsl(240, 10%, 4%);
+  --card-foreground: hsl(0, 0%, 98%);
+  --border: hsl(240, 4%, 16%);
+  --input: hsl(240, 4%, 16%);
+  --primary: hsl(12, 100%, 62%);
+  --primary-foreground: hsl(0, 0%, 98%);
+  --secondary: hsl(153, 60%, 53%);
+  --secondary-foreground: hsl(0, 0%, 98%);
+  --accent: hsl(240, 4%, 16%);
+  --accent-foreground: hsl(0, 0%, 98%);
+  --destructive: hsl(0, 63%, 31%);
+  --destructive-foreground: hsl(0, 0%, 98%);
+  --ring: hsl(240, 5%, 84%);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Sarabun', 'Prompt', 'Inter', sans-serif;
+  }
+  
+  .font-thai {
+    font-family: 'Sarabun', 'Prompt', 'Inter', sans-serif;
+  }
+}
+
+@layer components {
+  .tourderwang-primary {
+    background-color: var(--tourderwang-primary);
+  }
+  
+  .tourderwang-secondary {
+    background-color: var(--tourderwang-secondary);
+  }
+  
+  .tourderwang-accent {
+    background-color: var(--tourderwang-accent);
+  }
+  
+  .tourderwang-warning {
+    background-color: var(--tourderwang-warning);
+  }
+  
+  .text-tourderwang-primary {
+    color: var(--tourderwang-primary);
+  }
+  
+  .text-tourderwang-secondary {
+    color: var(--tourderwang-secondary);
+  }
+  
+  .text-tourderwang-accent {
+    color: var(--tourderwang-accent);
+  }
+  
+  .text-tourderwang-warning {
+    color: var(--tourderwang-warning);
+  }
+  
+  .bg-tourderwang-background {
+    background-color: var(--tourderwang-background);
+  }
+}
